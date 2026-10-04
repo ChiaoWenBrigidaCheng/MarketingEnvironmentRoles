@@ -69,20 +69,22 @@ function sfxTimeout(){
   tone(196,.24,'sawtooth',.07,.23);
 }
 
-function sleighBell(delay=0,vol=.045){
+
+function sleighBell(delay=0,vol=.055){
   if(!soundOn) return;
   initAudio();
   if(!audioCtx||!masterGain) return;
 
   const t=audioCtx.currentTime+delay;
 
-  // Noise-based sleigh bells: multiple short, bright metallic shakes.
-  for(let hit=0; hit<3; hit++){
-    const len=Math.floor(audioCtx.sampleRate*.10);
+  // Dense sleigh-bell shake: several short metallic bursts.
+  for(let hit=0; hit<4; hit++){
+    const len=Math.floor(audioCtx.sampleRate*.075);
     const buffer=audioCtx.createBuffer(1,len,audioCtx.sampleRate);
     const data=buffer.getChannelData(0);
+
     for(let i=0;i<len;i++){
-      const env=Math.exp(-i/(audioCtx.sampleRate*.020));
+      const env=Math.exp(-i/(audioCtx.sampleRate*.015));
       data[i]=(Math.random()*2-1)*env;
     }
 
@@ -91,19 +93,18 @@ function sleighBell(delay=0,vol=.045){
 
     const hp=audioCtx.createBiquadFilter();
     hp.type='highpass';
-    hp.frequency.value=4300+hit*550;
-    hp.Q.value=.7;
+    hp.frequency.value=5200+hit*350;
 
     const bp=audioCtx.createBiquadFilter();
     bp.type='bandpass';
-    bp.frequency.value=6900+hit*700;
-    bp.Q.value=2.2;
+    bp.frequency.value=7600+hit*420;
+    bp.Q.value=2.8;
 
     const g=audioCtx.createGain();
-    const st=t+hit*.027;
+    const st=t+hit*.018;
     g.gain.setValueAtTime(.0001,st);
-    g.gain.exponentialRampToValueAtTime(vol/(1+hit*.28),st+.004);
-    g.gain.exponentialRampToValueAtTime(.0001,st+.085);
+    g.gain.exponentialRampToValueAtTime(vol/(1+hit*.24),st+.003);
+    g.gain.exponentialRampToValueAtTime(.0001,st+.060);
 
     src.connect(hp);
     hp.connect(bp);
@@ -111,45 +112,46 @@ function sleighBell(delay=0,vol=.045){
     g.connect(masterGain);
 
     src.start(st);
-    src.stop(st+.11);
+    src.stop(st+.08);
   }
 
-  // Tiny metallic resonances make the shake read as bells, not static noise.
-  [2637,3322,4186].forEach((f,j)=>{
+  // Bright metal resonances.
+  [2959,3520,4186,5274].forEach((f,j)=>{
     const o=audioCtx.createOscillator();
     const g=audioCtx.createGain();
     o.type='sine';
-    o.frequency.setValueAtTime(f,t+j*.005);
+    o.frequency.setValueAtTime(f,t+j*.004);
     g.gain.setValueAtTime(.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol*.18/(j+1),t+.004);
-    g.gain.exponentialRampToValueAtTime(.0001,t+.10+j*.018);
+    g.gain.exponentialRampToValueAtTime(vol*.11/(j+1),t+.003);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.095);
     o.connect(g); g.connect(masterGain);
-    o.start(t); o.stop(t+.14);
+    o.start(t); o.stop(t+.11);
   });
 }
 
-function christmasChime(freq,delay=0,vol=.03,dur=.30){
+function christmasBell(freq,delay=0,vol=.026,dur=.28){
   if(!soundOn) return;
   initAudio();
   if(!audioCtx||!masterGain) return;
   const t=audioCtx.currentTime+delay;
 
-  // Bell/celesta tone: soft fundamental + octave + bright upper partial.
-  [[freq,'sine',1],[freq*2,'sine',.28],[freq*2.52,'triangle',.10]].forEach(([f,type,m],j)=>{
+  [[freq,'sine',1],[freq*2,'sine',.34],[freq*3,'triangle',.10]].forEach(([f,type,m],j)=>{
     const o=audioCtx.createOscillator();
     const g=audioCtx.createGain();
     o.type=type;
     o.frequency.setValueAtTime(f,t);
     g.gain.setValueAtTime(.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol*m,t+.006);
-    g.gain.exponentialRampToValueAtTime(.0001,t+dur*(j===0?1:.62));
-    o.connect(g); g.connect(masterGain);
-    o.start(t); o.stop(t+dur+.04);
+    g.gain.exponentialRampToValueAtTime(vol*m,t+.005);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur*(j===0?1:.55));
+    o.connect(g);
+    g.connect(masterGain);
+    o.start(t);
+    o.stop(t+dur+.03);
   });
 }
 
-function warmPad(notes,delay=0,dur=.75,vol=.009){
-  notes.forEach((n,j)=>tone(n,dur,'sine',vol,delay+j*.012));
+function softChord(notes,delay=0,dur=.70,vol=.008){
+  notes.forEach((n,j)=>tone(n,dur,'sine',vol,delay+j*.01));
 }
 
 function startMusic(){
@@ -157,66 +159,72 @@ function startMusic(){
   initAudio();
   if(!audioCtx||musicTimer) return;
 
-  // Original western Christmas-pop game loop:
-  // strong sleigh bells, bright chimes, major-key harmony, no borrowed song melody.
-  const progression=[
-    {arp:[523,659,784,1047], pad:[262,330,392,523], bass:131}, // C
-    {arp:[349,440,523,698],  pad:[175,220,262,349], bass:87},  // F
-    {arp:[392,494,587,784],  pad:[196,247,294,392], bass:98},  // G
-    {arp:[440,523,659,880],  pad:[220,262,330,440], bass:110}, // Am
-    {arp:[349,440,523,698],  pad:[175,220,262,349], bass:87},  // F
-    {arp:[392,494,587,784],  pad:[196,247,294,392], bass:98},  // G
-    {arp:[523,659,784,1047], pad:[262,330,392,523], bass:131}, // C
-    {arp:[392,494,659,988],  pad:[196,247,330,392], bass:98}   // G
+  // C-major Christmas game background.
+  // Inspired by classic sleigh-bell holiday music, not a copy of any song melody.
+  const bars=[
+    {chord:[261.63,329.63,392.00,523.25], bass:130.81}, // C
+    {chord:[261.63,349.23,440.00,523.25], bass:174.61}, // F/C
+    {chord:[293.66,392.00,493.88,587.33], bass:146.83}, // G/D
+    {chord:[261.63,329.63,392.00,523.25], bass:130.81}, // C
+
+    {chord:[261.63,349.23,440.00,523.25], bass:174.61}, // F
+    {chord:[293.66,392.00,493.88,587.33], bass:196.00}, // G
+    {chord:[261.63,329.63,392.00,523.25], bass:130.81}, // C
+    {chord:[293.66,392.00,493.88,587.33], bass:196.00}  // G turnaround
   ];
 
-  // Gentle, original bell motif using stepwise diatonic motion.
-  const bellMotif=[
-    1047,1175,1319,1175,
-    1047,988,880,988,
-    1047,1175,1319,1568,
-    1319,1175,1047,988
+  // Simple C-major bell motif with repeated-note bounce typical of Christmas music.
+  // This is an original motif, not the Jingle Bells melody.
+  const motif=[
+    659.25,659.25,783.99,659.25,
+    698.46,659.25,587.33,523.25,
+    659.25,659.25,783.99,880.00,
+    783.99,698.46,659.25,587.33
   ];
 
+  const arpOrder=[0,1,2,1,3,2,1,2];
   let step=0;
 
   const tick=()=>{
     if(!soundOn||!audioCtx) return;
 
     const eighth=step%8;
-    const bar=Math.floor(step/8)%progression.length;
-    const ch=progression[bar];
+    const bar=Math.floor(step/8)%bars.length;
+    const h=bars[bar];
 
-    // Sleigh bells are the main rhythmic identity: every eighth note.
-    sleighBell(.0, eighth%2 ? .050 : .036);
+    // Sleigh bells on every eighth note.
+    sleighBell(0,eighth%2===0?.060:.050);
 
-    // Add a second lighter jingle on the offbeats for a fuller "sleigh" texture.
+    // Extra jingle on upbeat creates the "jing-jing" holiday feel.
     if(eighth===1||eighth===3||eighth===5||eighth===7){
-      sleighBell(.075,.026);
+      sleighBell(.070,.030);
     }
 
-    // Sparkling celesta arpeggio, deliberately simple and western major-key.
-    const arpOrder=[0,1,2,1,3,2,1,2];
-    christmasChime(ch.arp[arpOrder[eighth]],.015,.021,.24);
+    // Bright bell arpeggio in C major.
+    christmasBell(h.chord[arpOrder[eighth]],.012,.020,.22);
 
-    // A light bell melody every quarter note.
+    // Simple lead bell every quarter note.
     if(eighth%2===0){
-      christmasChime(bellMotif[((step/2)|0)%bellMotif.length],.045,.017,.34);
+      christmasBell(motif[((step/2)|0)%motif.length],.040,.015,.30);
     }
 
-    // Warm pop harmony and simple bass pulse.
+    // Soft harmonic bed.
     if(eighth===0){
-      warmPad(ch.pad,0,.86,.008);
-      tone(ch.bass,.28,'sine',.028,0);
-    }
-    if(eighth===4){
-      tone(ch.bass*2,.19,'sine',.018,0);
+      softChord(h.chord,0,.85,.007);
+      tone(h.bass,.24,'sine',.026,0);
     }
 
-    // Small Christmas "ding-ding" at the end of each bar.
+    // Light bass bounce on beat 3.
+    if(eighth===4){
+      tone(h.bass*2,.18,'sine',.016,0);
+    }
+
+    // End-of-bar double chime.
+    if(eighth===6){
+      christmasBell(1046.50,.045,.013,.20);
+    }
     if(eighth===7){
-      christmasChime(ch.arp[2]*2,.09,.014,.22);
-      christmasChime(ch.arp[3]*2,.17,.012,.20);
+      christmasBell(1318.51,.090,.014,.22);
     }
 
     step++;
@@ -224,8 +232,8 @@ function startMusic(){
 
   tick();
 
-  // ~124 BPM eighth-note pulse: lively enough for a game, but not frantic.
-  musicTimer=setInterval(tick,242);
+  // Around 126 BPM eighth-note pulse: lively game tempo.
+  musicTimer=setInterval(tick,238);
 }
 
 function stopMusic(){
